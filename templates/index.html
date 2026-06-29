@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loan Defaulter Predictor</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#16213a; --text:#e2e8f0; --muted:#94a3b8;
+    --accent:#6366f1; --accent2:#818cf8; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+    --border:#334155;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+    background:linear-gradient(135deg,var(--bg),#1a1530); color:var(--text);
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:920px; background:var(--panel); border:1px solid var(--border);
+    border-radius:16px; padding:32px; box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+  h1{margin:0 0 4px; font-size:26px;}
+  .sub{color:var(--muted); margin-bottom:24px; font-size:14px;}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:640px){.grid{grid-template-columns:1fr;}}
+  label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px;}
+  input, select{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:14px; outline:none;
+  }
+  input:focus, select:focus{border-color:var(--accent);}
+  .field{margin-bottom:16px;}
+  button{
+    margin-top:8px; width:100%; padding:13px; border:none; border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff;
+    font-size:15px; font-weight:600; cursor:pointer; transition:transform .15s ease;
+  }
+  button:hover{transform:translateY(-1px);}
+  .result{
+    margin-top:28px; padding:20px; border-radius:12px; border:1px solid var(--border);
+    background:var(--panel2);
+  }
+  .result.safe{border-color:var(--green);}
+  .result.risk{border-color:var(--red);}
+  .label{font-size:20px; font-weight:700; margin-bottom:8px;}
+  .bar-wrap{height:10px; border-radius:6px; background:#0b1120; overflow:hidden; margin:6px 0 4px;}
+  .bar{height:100%; border-radius:6px;}
+  .stats{display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:14px;}
+  .badge{
+    display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;
+    margin-left:8px;
+  }
+  .badge.Low{background:rgba(34,197,94,.15); color:var(--green);}
+  .badge.Medium{background:rgba(245,158,11,.15); color:var(--amber);}
+  .badge.High{background:rgba(239,68,68,.15); color:var(--red);}
+  .badge.Very.High{background:rgba(239,68,68,.25); color:var(--red);}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Loan Defaulter Predictor</h1>
+    <p class="sub">Estimate the probability that an applicant will default on a loan.</p>
+
+    <form method="post" action="/predict">
+      <div class="grid">
+        <div class="field">
+          <label>Age</label>
+          <input type="number" name="age" min="18" max="100" required
+                 value="{{ form_data.age if form_data else 30 }}">
+        </div>
+        <div class="field">
+          <label>Annual Income ($)</label>
+          <input type="number" name="income" step="0.01" min="0" required
+                 value="{{ form_data.income if form_data else 50000 }}">
+        </div>
+        <div class="field">
+          <label>Loan Amount ($)</label>
+          <input type="number" name="loan_amount" step="0.01" min="0" required
+                 value="{{ form_data.loan_amount if form_data else 15000 }}">
+        </div>
+        <div class="field">
+          <label>Credit Score</label>
+          <input type="number" name="credit_score" min="300" max="850" required
+                 value="{{ form_data.credit_score if form_data else 650 }}">
+        </div>
+        <div class="field">
+          <label>Employment Years</label>
+          <input type="number" name="employment_years" min="0" max="60" required
+                 value="{{ form_data.employment_years if form_data else 5 }}">
+        </div>
+        <div class="field">
+          <label>Education Level</label>
+          <select name="education_level">
+            {% set edu = form_data.education_level if form_data else 'Bachelors' %}
+            <option value="High School" {{ 'selected' if edu=='High School' }}>High School</option>
+            <option value="Bachelors" {{ 'selected' if edu=='Bachelors' }}>Bachelors</option>
+            <option value="Masters" {{ 'selected' if edu=='Masters' }}>Masters</option>
+            <option value="PhD" {{ 'selected' if edu=='PhD' }}>PhD</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Housing Status</label>
+          <select name="housing_status">
+            {% set hs = form_data.housing_status if form_data else 'Mortgage' %}
+            <option value="Mortgage" {{ 'selected' if hs=='Mortgage' }}>Mortgage</option>
+            <option value="Own" {{ 'selected' if hs=='Own' }}>Own</option>
+            <option value="Rent" {{ 'selected' if hs=='Rent' }}>Rent</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit">Predict Default Risk</button>
+    </form>
+
+    {% if result %}
+    <div class="result {{ 'risk' if result.is_defaulter else 'safe' }}">
+      <div class="label">
+        {{ result.label }}
+        <span class="badge {{ result.risk_level.replace(' ', '.') }}">{{ result.risk_level }} Risk</span>
+      </div>
+      <label>Default probability: {{ result.default_prob }}%</label>
+      <div class="bar-wrap">
+        <div class="bar" style="width:{{ result.default_prob }}%; background:{{ '#ef4444' if result.is_defaulter else '#22c55e' }};"></div>
+      </div>
+      <div class="stats">
+        <span>Default probability: {{ result.default_prob }}%</span>
+        <span>Safe probability: {{ result.safe_prob }}%</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>
